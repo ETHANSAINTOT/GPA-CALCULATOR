@@ -1,0 +1,14 @@
+services:
+  gpa-calculator:
+    build: .
+    image: gpa-calculator
+    ports:
+      - "127.0.0.1:5984:5984"
+    environment:
+      ENCRYPTION_KEY: "${ENCRYPTION_KEY:?ENCRYPTION_KEY manquante dans .env, voir le README}"
+    volumes:
+      - gpa-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  gpa-data:

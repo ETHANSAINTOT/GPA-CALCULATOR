@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Calculateur · GPA Calculator</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="hello">Hello <strong id="first-name"></strong></span>
+      <span class="pill"><span id="credits">–</span> crédits</span>
+    </div>
+    <div class="topbar-right">
+      <button type="button" class="btn btn-sm" id="sign-out">Sign out</button>
+      <button type="button" class="btn btn-sm btn-danger-ghost" id="delete-account">Delete my account</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card gpa-card" aria-live="polite">
+      <p class="gpa-label">Ton GPA</p>
+      <p class="gpa-value"><span id="gpa">–</span><span class="gpa-max"> / 4.00</span></p>
+      <div class="gpa-meter" aria-hidden="true"><div class="gpa-meter-fill" id="gpa-meter"></div></div>
+      <p class="gpa-detail muted" id="gpa-detail"></p>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <h2 id="form-title">Ajouter une unité d'enseignement</h2>
+      </div>
+      <form id="ue-form" class="ue-form" novalidate>
+        <label>Nom de l'UE
+          <input name="name" maxlength="100" placeholder="ex. B-PRO-300" autocomplete="off" required>
+        </label>
+        <label>Crédits
+          <input name="credits" type="number" inputmode="numeric" min="0" max="100" step="1" placeholder="ex. 4" required>
+        </label>
+        <label>Grade visé
+          <select name="grade">
+            <option value="A">A (4)</option>
+            <option value="B">B (3)</option>
+            <option value="C" selected>C (2)</option>
+            <option value="D">D (1)</option>
+            <option value="E">E (0)</option>
+          </select>
+        </label>
+        <p class="preview" id="preview" hidden></p>
+        <p class="form-error" role="alert" hidden></p>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="ue-submit">Ajouter</button>
+          <button type="button" class="btn" id="ue-cancel" hidden>Annuler</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <h2>Mes unités d'enseignement</h2>
+        <span class="muted" id="ue-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="ue-table" hidden>
+          <thead>
+            <tr>
+              <th scope="col">UE</th>
+              <th scope="col">Crédits</th>
+              <th scope="col">Grade</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody id="ue-rows"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="ue-empty">Aucune UE pour l'instant. Ajoute-en une pour voir ton GPA évoluer.</p>
+    </section>
+  </main>
+
+  <dialog id="delete-dialog" aria-labelledby="delete-title">
+    <form id="delete-form" class="form" novalidate>
+      <h2 id="delete-title">Supprimer mon compte</h2>
+      <p>Cette action est définitive : ton compte et toutes tes UE seront supprimés.</p>
+      <label><span>Pour confirmer, écris <code>DELETEMYACCOUNT-FORCE</code></span>
+        <input name="confirmation" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </label>
+      <p class="form-error" role="alert" hidden></p>
+      <div class="form-actions">
+        <button type="button" class="btn" id="delete-cancel">Annuler</button>
+        <button type="submit" class="btn btn-danger" id="delete-confirm" disabled>Supprimer définitivement</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/js/calculator.js"></script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connexion · GPA Calculator</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="centered">
+  <main class="card auth-card">
+    <h1>Connexion</h1>
+    <p class="muted">Content de te revoir.</p>
+
+    <form id="login-form" class="form" novalidate>
+      <label>Adresse mail
+        <input name="email" type="email" autocomplete="email" required>
+      </label>
+      <label>Mot de passe
+        <input name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <p class="form-error" role="alert" hidden></p>
+      <button type="submit" class="btn btn-primary btn-block">Se connecter</button>
+    </form>
+
+    <a class="back-link" href="/">← Retour</a>
+  </main>
+
+  <script type="module">
+    import { api, onSubmit } from '/js/api.js';
+
+    onSubmit(document.querySelector('#login-form'), async (data) => {
+      await api('POST', '/api/login', data);
+      location.href = '/calculator';
+    });
+  </script>
+</body>
+</html>

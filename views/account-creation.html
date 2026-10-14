@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Créer un compte · GPA Calculator</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="centered">
+  <main class="card auth-card">
+    <h1>Créer un compte</h1>
+    <p class="muted">Renseigne ton GPA et tes crédits actuels : ils serviront de point de départ au calcul.</p>
+
+    <form id="account-form" class="form" novalidate>
+      <div class="form-row">
+        <label>Prénom
+          <input name="firstName" autocomplete="given-name" maxlength="50" required>
+        </label>
+        <label>Nom
+          <input name="lastName" autocomplete="family-name" maxlength="50" required>
+        </label>
+      </div>
+      <label>Adresse mail
+        <input name="email" type="email" autocomplete="email" required>
+      </label>
+      <label><span>Mot de passe <span class="hint">· 8 caractères minimum</span></span>
+        <input name="password" type="password" autocomplete="new-password" minlength="8" required>
+      </label>
+      <div class="form-row">
+        <label>Crédits actuels
+          <input name="credits" type="number" inputmode="numeric" min="0" max="1000" step="1" placeholder="ex. 120" required>
+        </label>
+        <label><span>GPA actuel <span class="hint">· de 0.00 à 4.00</span></span>
+          <input name="gpa" type="number" inputmode="decimal" min="0" max="4" step="0.01" placeholder="ex. 3.20" required>
+        </label>
+      </div>
+      <p class="form-error" role="alert" hidden></p>
+      <button type="submit" class="btn btn-primary btn-block">Créer</button>
+    </form>
+
+    <a class="back-link" href="/">← Retour</a>
+  </main>
+
+  <script type="module">
+    import { api, onSubmit } from '/js/api.js';
+
+    onSubmit(document.querySelector('#account-form'), async (data) => {
+      await api('POST', '/api/accounts', data);
+      location.href = '/account-creation-success';
+    });
+  </script>
+</body>
+</html>
