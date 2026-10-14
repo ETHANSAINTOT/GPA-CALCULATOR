@@ -24,4 +24,4 @@ EXPOSE 5984
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:' + process.env.PORT + '/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
 
-CMD ["node", "--disable-warning=ExperimentalWarning", "server.js"]
+CMD ["node", "server.js"]

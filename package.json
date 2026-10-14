@@ -2,19 +2,20 @@
   "name": "gpa-calculator",
   "version": "1.0.0",
   "private": true,
-  "description": "Calculateur de GPA (Node.js + SQLite)",
+  "description": "Calculateur de GPA (Node.js + libSQL), hébergeable sur Vercel ou Docker",
   "type": "module",
   "main": "server.js",
   "engines": {
-    "node": ">=22.13"
+    "node": "22.x"
   },
   "scripts": {
-    "start": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning server.js",
-    "dev": "node --env-file-if-exists=.env --watch --disable-warning=ExperimentalWarning server.js",
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --env-file-if-exists=.env --watch server.js",
     "key": "node -e \"console.log(require('node:crypto').randomBytes(32).toString('base64'))\"",
-    "test": "node --disable-warning=ExperimentalWarning --test"
+    "test": "node --test"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "express": "^5.3.0"
   }
 }

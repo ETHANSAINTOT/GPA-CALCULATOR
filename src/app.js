@@ -5,7 +5,7 @@ import {
   clearSessionCookie,
   createSession,
   deleteSession,
-  findSessionUserId,
+  findSessionUser,
   hashPassword,
   readSessionToken,
   setSessionCookie,
@@ -17,7 +17,6 @@ import {
   deleteUe,
   deleteUser,
   findUserByEmail,
-  findUserById,
   listUes,
   updateUe,
 } from './store.js';
@@ -76,9 +75,9 @@ function parseUeId(req) {
   return id;
 }
 
-function userState(user) {
+async function userState(user) {
   const { firstName, lastName, email, baseCredits, baseGpa } = user;
-  const ues = listUes(user.id);
+  const ues = await listUes(user.id);
   return {
     user: { firstName, lastName, email, baseCredits, baseGpa },
     ues,
@@ -89,10 +88,16 @@ function userState(user) {
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
+  // Behind Vercel's proxy: trust X-Forwarded-Proto so req.secure reflects HTTPS.
+  if (process.env.VERCEL) app.set('trust proxy', true);
+
+  // Static assets (served by Vercel's CDN in production, so they never reach this function there)
+  app.use(express.static(path.join(ROOT, 'public')));
+  app.use('/shared', express.static(path.join(ROOT, 'shared')));
+
   app.use(express.json({ limit: '10kb' }));
-  app.use((req, res, next) => {
-    const userId = findSessionUserId(readSessionToken(req));
-    req.user = userId === undefined ? undefined : findUserById(userId);
+  app.use(async (req, res, next) => {
+    req.user = await findSessionUser(readSessionToken(req));
     next();
   });
 
@@ -106,8 +111,6 @@ export function createApp() {
   app.get('/account-creation-success', page('account-creation-success'));
   app.get('/connection', guestOnly, page('connection'));
   app.get('/calculator', signedInOnly, page('calculator'));
-  app.use(express.static(path.join(ROOT, 'public')));
-  app.use('/shared', express.static(path.join(ROOT, 'shared')));
 
   // API
   const requireUser = (req, res, next) => {
@@ -127,55 +130,56 @@ export function createApp() {
     }
     const credits = parseCredits(body.credits, 'Le nombre de crédits', MAX_BASE_CREDITS);
     const gpa = parseGpa(body.gpa);
-    if (findUserByEmail(email)) throw new HttpError(409, 'Un compte existe déjà avec cette adresse mail.');
 
     const passwordHash = await hashPassword(password);
-    createUser({ email, firstName, lastName, passwordHash, baseCredits: credits, baseGpa: gpa });
+    if (!(await createUser({ email, firstName, lastName, passwordHash, baseCredits: credits, baseGpa: gpa }))) {
+      throw new HttpError(409, 'Un compte existe déjà avec cette adresse mail.');
+    }
     res.status(201).json({ ok: true });
   });
 
   app.post('/api/login', async (req, res) => {
     const { email, password } = req.body ?? {};
-    const user = typeof email === 'string' ? findUserByEmail(email) : undefined;
+    const user = typeof email === 'string' ? await findUserByEmail(email) : undefined;
     if (!user || typeof password !== 'string' || !(await verifyPassword(password, user.passwordHash))) {
       throw new HttpError(401, 'Adresse mail ou mot de passe incorrect.');
     }
-    setSessionCookie(res, createSession(user.id));
+    setSessionCookie(req, res, await createSession(user.id));
     res.json({ ok: true });
   });
 
-  app.post('/api/logout', (req, res) => {
-    deleteSession(readSessionToken(req));
+  app.post('/api/logout', async (req, res) => {
+    await deleteSession(readSessionToken(req));
     clearSessionCookie(res);
     res.status(204).end();
   });
 
-  app.delete('/api/account', requireUser, (req, res) => {
+  app.delete('/api/account', requireUser, async (req, res) => {
     if (req.body?.confirmation !== DELETE_CONFIRMATION) {
       throw badRequest(`Écris exactement ${DELETE_CONFIRMATION} pour confirmer.`);
     }
-    deleteUser(req.user.id);
+    await deleteUser(req.user.id);
     clearSessionCookie(res);
     res.status(204).end();
   });
 
-  app.get('/api/me', requireUser, (req, res) => {
-    res.json(userState(req.user));
+  app.get('/api/me', requireUser, async (req, res) => {
+    res.json(await userState(req.user));
   });
 
-  app.post('/api/ues', requireUser, (req, res) => {
-    createUe(req.user.id, parseUe(req.body));
-    res.status(201).json(userState(req.user));
+  app.post('/api/ues', requireUser, async (req, res) => {
+    await createUe(req.user.id, parseUe(req.body));
+    res.status(201).json(await userState(req.user));
   });
 
-  app.put('/api/ues/:id', requireUser, (req, res) => {
-    if (!updateUe(req.user.id, parseUeId(req), parseUe(req.body))) throw new HttpError(404, 'UE introuvable.');
-    res.json(userState(req.user));
+  app.put('/api/ues/:id', requireUser, async (req, res) => {
+    if (!(await updateUe(req.user.id, parseUeId(req), parseUe(req.body)))) throw new HttpError(404, 'UE introuvable.');
+    res.json(await userState(req.user));
   });
 
-  app.delete('/api/ues/:id', requireUser, (req, res) => {
-    if (!deleteUe(req.user.id, parseUeId(req))) throw new HttpError(404, 'UE introuvable.');
-    res.json(userState(req.user));
+  app.delete('/api/ues/:id', requireUser, async (req, res) => {
+    if (!(await deleteUe(req.user.id, parseUeId(req)))) throw new HttpError(404, 'UE introuvable.');
+    res.json(await userState(req.user));
   });
 
   app.use('/api', () => {

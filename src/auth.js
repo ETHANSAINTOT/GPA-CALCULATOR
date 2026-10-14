@@ -1,7 +1,8 @@
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { sha256 } from './crypto.js';
-import { db } from './db.js';
+import { batch, execute } from './db.js';
+import { findUserBySessionHash } from './store.js';
 
 const scryptAsync = promisify(scrypt);
 const KEY_LENGTH = 64;
@@ -24,24 +25,24 @@ export async function verifyPassword(password, stored) {
 }
 
 // Only a hash of each session token is stored: a leaked database cannot be used to hijack a session.
-const insertSession = db.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)');
-const selectSessionUserId = db.prepare('SELECT user_id FROM sessions WHERE token_hash = ? AND expires_at > ?');
-const deleteSessionByHash = db.prepare('DELETE FROM sessions WHERE token_hash = ?');
-const deleteExpiredSessions = db.prepare('DELETE FROM sessions WHERE expires_at <= ?');
-
-export function createSession(userId) {
-  deleteExpiredSessions.run(Date.now());
+export async function createSession(userId) {
   const token = randomBytes(32).toString('base64url');
-  insertSession.run(sha256(token), userId, Date.now() + SESSION_TTL_MS);
+  await batch([
+    { sql: 'DELETE FROM sessions WHERE expires_at <= ?', args: [Date.now()] },
+    {
+      sql: 'INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)',
+      args: [sha256(token), userId, Date.now() + SESSION_TTL_MS],
+    },
+  ]);
   return token;
 }
 
-export function findSessionUserId(token) {
-  return token ? selectSessionUserId.get(sha256(token), Date.now())?.user_id : undefined;
+export async function findSessionUser(token) {
+  return token ? findUserBySessionHash(sha256(token)) : undefined;
 }
 
-export function deleteSession(token) {
-  if (token) deleteSessionByHash.run(sha256(token));
+export async function deleteSession(token) {
+  if (token) await execute('DELETE FROM sessions WHERE token_hash = ?', [sha256(token)]);
 }
 
 export function readSessionToken(req) {
@@ -52,8 +53,9 @@ export function readSessionToken(req) {
   return undefined;
 }
 
-export function setSessionCookie(res, token) {
-  res.cookie(SESSION_COOKIE, token, { ...COOKIE_OPTIONS, maxAge: SESSION_TTL_MS });
+// Secure (HTTPS-only) whenever the request came over HTTPS, as on Vercel.
+export function setSessionCookie(req, res, token) {
+  res.cookie(SESSION_COOKIE, token, { ...COOKIE_OPTIONS, secure: req.secure, maxAge: SESSION_TTL_MS });
 }
 
 export function clearSessionCookie(res) {

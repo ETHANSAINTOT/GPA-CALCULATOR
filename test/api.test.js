@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { after, before, test } from 'node:test';
 
-process.env.DB_PATH = ':memory:';
+process.env.DATABASE_URL = ':memory:';
 process.env.ENCRYPTION_KEY = randomBytes(32).toString('base64');
 const { createApp } = await import('../src/app.js');
-const { db } = await import('../src/db.js');
+const { execute } = await import('../src/db.js');
 
 let server;
 let baseUrl;
@@ -87,7 +87,8 @@ test('UEs can be added, edited and deleted, and the GPA follows', async () => {
 test('nothing sensitive is stored in clear in the database', async () => {
   await call('POST', '/api/ues', { name: 'B-PRO-300', credits: '4', grade: 'A' });
   const token = cookie.split('=')[1];
-  const dump = JSON.stringify(['users', 'ues', 'sessions'].map((table) => db.prepare(`SELECT * FROM ${table}`).all()));
+  const tables = await Promise.all(['users', 'ues', 'sessions'].map((table) => execute(`SELECT * FROM ${table}`)));
+  const dump = JSON.stringify(tables.map(({ rows }) => rows));
 
   for (const secret of ['Augusta', 'Lovelace', 'ada@example.com', account.password, 'B-PRO-300', '"A"', token]) {
     assert.ok(!dump.includes(secret), `${secret} est stocké en clair`);
@@ -95,9 +96,13 @@ test('nothing sensitive is stored in clear in the database', async () => {
   assert.equal((await call('GET', '/api/me')).data.ues[0].name, 'B-PRO-300');
 });
 
-test('deleting the account needs the exact confirmation', async () => {
+test('deleting the account needs the exact confirmation and removes all its data', async () => {
   assert.equal((await call('DELETE', '/api/account', { confirmation: 'deletemyaccount-force' })).status, 400);
   assert.equal((await call('DELETE', '/api/account', { confirmation: 'DELETEMYACCOUNT-FORCE' })).status, 204);
   cookie = '';
   assert.equal((await call('POST', '/api/login', { email: account.email, password: account.password })).status, 401);
+
+  for (const table of ['users', 'ues', 'sessions']) {
+    assert.equal((await execute(`SELECT count(*) AS n FROM ${table}`)).rows[0].n, 0, `${table} n'est pas vide`);
+  }
 });

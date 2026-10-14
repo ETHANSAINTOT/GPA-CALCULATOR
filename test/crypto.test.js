@@ -5,20 +5,24 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { pathToFileURL } from 'node:url';
 
 const newKey = () => randomBytes(32).toString('base64');
 
 process.env.ENCRYPTION_KEY = newKey();
 const { blindIndex, decrypt, encrypt } = await import('../src/crypto.js');
 
-// Imports a module in a fresh Node process with the given environment.
-function importWith(module, env) {
-  const url = new URL(module, import.meta.url).href;
-  return spawnSync(process.execPath, ['--disable-warning=ExperimentalWarning', '--input-type=module', '-e', `await import(${JSON.stringify(url)})`], {
+// Runs `code` as an ES module in a fresh Node process with the given environment.
+function runWith(code, env) {
+  return spawnSync(process.execPath, ['--input-type=module', '-e', code], {
     env: { ...process.env, ...env },
     encoding: 'utf8',
   });
 }
+
+const moduleUrl = (module) => JSON.stringify(new URL(module, import.meta.url).href);
+const importCrypto = (env) => runWith(`await import(${moduleUrl('../src/crypto.js')})`, env);
+const openDb = (env) => runWith(`const db = await import(${moduleUrl('../src/db.js')}); await db.initDb(); await db.closeDb();`, env);
 
 test('encrypted values decrypt back to the original', () => {
   for (const value of ['Ada', 'éèà ç 🎓', '3.2', '']) {
@@ -47,7 +51,7 @@ test('the blind index is deterministic and hides the value', () => {
 
 test('a missing or malformed key stops the app', () => {
   for (const ENCRYPTION_KEY of ['', 'trop-courte', randomBytes(16).toString('base64')]) {
-    const result = importWith('../src/crypto.js', { ENCRYPTION_KEY });
+    const result = importCrypto({ ENCRYPTION_KEY });
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /ENCRYPTION_KEY/);
   }
@@ -56,12 +60,12 @@ test('a missing or malformed key stops the app', () => {
 test('a key that did not encrypt the database stops the app', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'gpa-test-'));
   try {
-    const DB_PATH = path.join(dir, 'gpa.sqlite');
+    const DATABASE_URL = pathToFileURL(path.join(dir, 'gpa.sqlite')).href;
     const key = newKey();
-    assert.equal(importWith('../src/db.js', { DB_PATH, ENCRYPTION_KEY: key }).status, 0);
-    assert.equal(importWith('../src/db.js', { DB_PATH, ENCRYPTION_KEY: key }).status, 0);
+    assert.equal(openDb({ DATABASE_URL, ENCRYPTION_KEY: key }).status, 0);
+    assert.equal(openDb({ DATABASE_URL, ENCRYPTION_KEY: key }).status, 0);
 
-    const wrongKey = importWith('../src/db.js', { DB_PATH, ENCRYPTION_KEY: newKey() });
+    const wrongKey = openDb({ DATABASE_URL, ENCRYPTION_KEY: newKey() });
     assert.notEqual(wrongKey.status, 0);
     assert.match(wrongKey.stderr, /ne correspond pas/);
   } finally {
